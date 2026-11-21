@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食光軌跡 - 新化篇（地瓜職人挑戰）</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="minigame-view" id="minigameView" style="display: none;">
+            <div class="hud-bar">
+                <div class="stage-title" id="stageTitle">第一關：地瓜採收大作戰</div>
+                <div class="timer-box" id="timerBox">剩餘時間: <span id="timerText">60</span>s</div>
+                <div class="score-box" id="scoreBox">採收數量: <span id="scoreText">0 / 4</span></div>
+            </div>
+
+            <!-- 第一關：先點鏟子 -> 點一次土堆自動挖開 -> 按住地瓜往上拖拉晃動拔出 (60秒) -->
+            <div class="game-stage" id="stage1Area" style="display: none;">
+                <div class="stage-guide-banner" id="stage1Hint">👉 請先點擊右下角「鏟子圖標」裝備鏟子！</div>
+                <div class="dirt-grid" id="dirtGrid"></div>
+                <div class="shovel-tool" id="shovelTool" onclick="equipShovel()">
+                    <img src="地瓜田/鏟子.png" alt="鏟子">
+                    <span id="shovelToolLabel">點擊裝備鏟子</span>
+                </div>
+            </div>
+
+            <!-- 第二關：一顆一顆清洗 -> 移動滑鼠刷子才動 -> 降低髒掉的地瓜_2.png 透明度變成 生地瓜.png -->
+            <div class="game-stage" id="stage2Area" style="display: none;">
+                <div class="wash-bench">
+                    <div class="stage-guide-banner" id="stage2Hint">👉 請先點擊右下角「刷子圖標」，再移動滑鼠刷洗地瓜！</div>
+                    <div class="single-wash-stage" id="washContainer"></div>
+                    <div class="sponge-tool" id="spongeTool" onclick="equipBrush()">
+                        <img src="地瓜田/洗具刷子.png" alt="洗具刷子">
+                        <span id="brushToolLabel">點擊裝備刷子</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 第三關：左邊直立溫度計(轉90度)、右邊地瓜、下面控制火候按鈕 -->
+            <div class="game-stage" id="stage3Area" style="display: none;">
+                <div class="oven-stage-wrapper">
+                    <div class="oven-main-row">
+                        <!-- 左側：轉 90 度的直立溫度計與指針 -->
+                        <div class="temp-gauge-left">
+                            <!-- 溫度變化提醒移到原本三行提示的位置 -->
+                            <div class="temp-text" id="tempStatusText">🟡 黃色區：火候剛好！</div>
+
+                            <div class="vertical-gauge-box">
+                                <div class="rotated-gauge-inner">
+                                    <img src="地瓜田/烤箱溫度計2.png" class="bar-gauge-bg" alt="烤箱溫度計">
+                                    <img src="地瓜田/烤箱溫度計指針2.png" class="bar-gauge-pointer" id="tempPointer" alt="溫度計指針">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 右側：烘烤中的地瓜（5種熟度） -->
+                        <div class="single-oven-stage" id="ovenSlots"></div>
+                    </div>
+
+                    <!-- 下方：控制火候按鈕 -->
+                    <div class="temp-controls-bottom">
+                        <button class="control-btn" onclick="adjustHeat(-14)">🔥 減火</button>
+                        <button class="control-btn" onclick="adjustHeat(14)">🔥🔥 加火</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 歷史書 Modal -->
+        <div class="projection-modal" id="historyBookModal">
+            <div class="book-controls">
+                <button class="nav-btn" id="prevPageBtn" onclick="changeBookPage(-1)" style="display: none;">◀ 上一頁</button>
+                <span class="page-indicator" id="pageIndicator">1 / 3</span>
+                <button class="nav-btn" id="nextPageBtn" onclick="changeBookPage(1)">下一頁 ▶</button>
+                <button class="action-btn" id="startStoryBtn" onclick="startStoryFromBook()" style="display: none;">📖 進入故事劇情 ▶</button>
+            </div>
+
+            <div class="projection-card">
+                <div class="card-content">
+                    <img src="歷史書/歷史書_新化.png" alt="新化歷史介紹" class="map-img">
+                    
+                    <div class="book-page active" id="bookPage1">
+                        <div class="text-overlay">
+                            <h3>地區歷史介紹：</h3>
+                            <p>新化區位於臺南市東側，早期稱為「大目降」，與平埔族西拉雅族的大目降社有著深厚的歷史淵源。日治時期改稱「新化街」，經過歷史發展與行政區域調整，成為今天的臺南市新化區。</p>
+                        </div>
+                    </div>
+
+                    <div class="book-page" id="bookPage2">
+                        <div class="text-overlay">
+                            <h3>新化五寶與美味地瓜：</h3>
+                            <p>除了老街風情，新化也擁有豐富農業資源。地瓜是「新化五寶」之一（與鳳梨、麻竹筍、橄欖、胡麻齊名）。烤地瓜利用炭火慢慢加熱，讓外皮帶有淡淡焦香，內部綿密香甜！！</p>
+                            <img src="歷史書/歷史書_新化五寶.png" class="page-decor-img farmer-img" alt="新化五寶" onerror="this.style.display='none';">
+                        </div>
+                    </div>
+
+                    <div class="book-page" id="bookPage3">
+                        <div class="text-overlay">
+                            <h3>用心烘烤的職人工藝：</h3>
+                            <p>要烤出美味的地瓜並不簡單！從小心採收、清洗泥土，到掌握烘烤火候與翻面時機，每個步驟都會影響口感與品質。準備好體驗這道工序了嗎？</p>
+                            <img src="歷史書/地瓜.png" class="page-decor-img product-img" alt="烤地瓜" onerror="this.style.display='none';">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="big-book-base">
+                <img src="歷史書/歷史書.png" alt="歷史書底座">
+            </div>
+        </div>
+
+        <!-- 劇情畫面 -->
+        <div class="story-modal" id="storyModal" onclick="handleStoryClick()">
+            <div class="story-box">
+                <div class="story-header" id="storyTitle">新化篇：地瓜職人挑戰</div>
+                <div class="story-body">
+                    <img src="劇情/冰店.jpg" class="story-bg" id="storyBg" alt="背景">
+                    <img src="小丸/吉祥物地瓜裝.png" class="story-character maruko" id="storyCharMaruko" alt="小丸" style="display:none;">
+                    <img src="地瓜田/地瓜農夫_差分2.png" class="story-character manager" id="storyCharManager" alt="老闆" style="display:none;">
+                    
+                    <div class="story-prop-display" id="storyPropDisplay" style="display:none;">
+                        <img src="" id="storyPropImg" alt="劇情道具">
+                    </div>
+
+                    <div class="dialogue-box">
+                        <div class="speaker-name" id="speakerName">旁白</div>
+                        <div class="dialogue-text" id="dialogueText"></div>
+                        <div class="story-choices" id="storyChoices" style="display:none;"></div>
+                    </div>
+                </div>
+                <div class="story-footer">
+                    <button class="nav-btn" id="nextDialogueBtn" onclick="nextDialogue(event)">按 Enter 繼續 ▶</button>
+                    <button class="action-btn" id="startPhaseBtn" onclick="startCurrentPhase(event)" style="display:none;">開始挑戰 ▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 彈窗 Modal -->
+        <div class="modal-overlay" id="gameModal">
+            <div class="modal-box">
+                <div class="modal-title" id="modalTitle">提示</div>
+                <div class="modal-img-wrap" id="modalImgWrap" style="display: none;">
+                    <img src="劇情/車票_新化.png" id="modalImg" alt="獎勵道具">
+                </div>
+                <div class="modal-text" id="modalText">內容</div>
+                <button class="action-btn modal-action-btn" id="modalBtn" onclick="closeModal()">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

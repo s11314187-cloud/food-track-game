@@ -1,10 +1,20 @@
-let pendingAction = null;
-
+let currentStoryStep = 0;
 let typewriterTimer = null;
+let modalDelayTimer = null;
 let currentFullText = "";
 let isTypewriting = false;
-let isChoiceAnswered = false;
-let modalDelayTimer = null;
+let pendingAction = null;
+let activePhase = 1;
+
+let currentBookPage = 1;
+const totalBookPages = 3;
+
+let gameStats = {
+    harvested: 0,
+    cleaned: 0,
+    bakedPerfect: 0,
+    damaged: 0
+};
 
 window.onload = function() {
     initGlobalKeyListener();
@@ -12,46 +22,9 @@ window.onload = function() {
     document.getElementById('historyBookModal').classList.add('active');
 };
 
-function initGlobalKeyListener() {
-    window.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            if (e.repeat) return;
-            const gameModal = document.getElementById('gameModal');
-            if (gameModal && gameModal.classList.contains('show')) {
-                closeModal();
-                return;
-            }
-
-            const storyModal = document.getElementById('storyModal');
-            if (!storyModal || !storyModal.classList.contains('active')) return;
-
-            const choicesEl = document.getElementById('storyChoices');
-            if (choicesEl && choicesEl.style.display !== 'none') return;
-
-            const startGameBtn = document.getElementById('startMinigameFromStoryBtn');
-            if (startGameBtn && startGameBtn.style.display !== 'none') {
-                showGameInstructionModal(e);
-                return;
-            }
-
-            nextDialogue(e);
-        }
-    });
+function clearToolCursors() {
+    document.body.classList.remove('cursor-shovel', 'cursor-brush');
 }
-
-function handleStoryClick() {
-    const choicesEl = document.getElementById('storyChoices');
-    if (choicesEl && choicesEl.style.display !== 'none') return;
-
-    const startGameBtn = document.getElementById('startMinigameFromStoryBtn');
-    if (startGameBtn && startGameBtn.style.display !== 'none') return;
-
-    nextDialogue();
-}
-
-let currentBookPage = 1;
-const totalBookPages = 3;
 
 function changeBookPage(direction) {
     const currentPageEl = document.getElementById(`bookPage${currentBookPage}`);
@@ -91,197 +64,141 @@ function resetBookPage() {
     if (startStoryBtn) startStoryBtn.style.display = 'none';
 }
 
-let currentStoryStep = 0;
-
-const storyScript = [
-    {
-        title: "一、抵達玉井：認識當地特產",
-        speaker: "小丸",
-        text: "「我們終於到玉井啦！這裡是台南很有名的芒果產地喔！你知道玉井最具代表性的農產品之一是什麼嗎？」",
-        marukoImg: "小丸/吉祥物1_舉手開口.png",
-        charImg: "",
-        bgImg: "背景/街道.png",
-        choices: [
-            { text: "「 當然知道！是芒果！」", nextText: "「答對了！真厲害！玉井的氣候和地形適合芒果生長，這裡的芒果香甜多汁，也是許多人夏天最期待的美味呢！」", marukoImg: "小丸/吉祥物_跳.png" },
-            { text: "「 不知道耶！快告訴我！」", nextText: "「答案就是芒果啦！玉井因為芒果產業而聞名，還有好多以芒果製作的特色美食喔！」", marukoImg: "小丸/吉祥物1_睜眼開口.png" }
-        ]
-    },
-    {
-        title: "一、抵達玉井：前往冰店",
-        speaker: "小丸",
-        text: "「聽說前面有一家很有名的芒果冰老店！我們去看看吧！」",
-        marukoImg: "小丸/吉祥物1_流口水.png",
-        charImg: "",
-        bgImg: "背景/街道.png"
-    },
-    {
-        title: "二、芒果冰店：店長求助",
-        speaker: "小丸",
-        text: "「哇！人好多啊！咦？今天怎麼只有店長一個人在忙？」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "二、芒果冰店：店長求助",
-        speaker: "店長",
-        text: "「唉……今天果園的採收人員和店裡的員工剛好都請假了，客人又突然變多，我一個人實在忙不過來。」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長_差分.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "二、芒果冰店：店長求助",
-        speaker: "小丸",
-        text: "「店長，別擔心！我們可以幫忙！你願意幫助店長嗎？」",
-        marukoImg: "小丸/吉祥物1_舉手開口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png",
-        choices: [
-            { 
-                text: " 「沒問題！我們來幫忙吧！」", 
-                speaker: "店長",
-                nextText: "「真的嗎？太感謝你們了！果園就在店後面，麻煩你們幫忙採收一些芒果吧！」", 
-                marukoImg: "小丸/吉祥物_跳.png", 
-                charImg: "劇情/芒果冰店長_差分.png" 
-            },
-            { 
-                text: " 「可以啊！完成後有芒果冰吃嗎？」", 
-                speaker: "小丸 & 店長",
-                nextText: "小丸：「哈哈！你果然是為了芒果冰來的！」\n店長：「沒問題！只要你們幫忙完成任務，我就請你們吃一碗招牌芒果冰！」", 
-                marukoImg: "小丸/吉祥物1_流口水.png", 
-                charImg: "劇情/芒果冰店長_差分.png" 
-            }
-        ]
-    },
-    {
-        title: "二、芒果冰店：準備挑戰",
-        speaker: "小丸",
-        text: "「交給我們吧！你準備好了嗎？」",
-        marukoImg: "小丸/吉祥物_跳.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png",
-        isGameTrigger: true
-    },
-    {
-        title: "四、任務完成：香甜的芒果冰",
-        speaker: "",
-        text: "（店長將新鮮芒果切成塊，放在剉冰上，再淋上濃郁的芒果醬。）",
-        marukoImg: "小丸/吉祥物1_流口水.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "四、任務完成：香甜的芒果冰",
-        speaker: "店長",
-        text: "「完成了！這就是我們玉井的招牌芒果冰！今天多虧你們幫忙，才能順利完成工作。」",
-        marukoImg: "小丸/吉祥物1_彎眉開口.png",
-        charImg: "劇情/芒果冰店長_差分.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "四、任務完成：香甜的芒果冰",
-        speaker: "店長",
-        text: "「這碗芒果冰就送給你們，當作感謝的禮物！希望你們能記住玉井的味道，也把這裡的故事分享給更多人！」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長_差分.png",
-        bgImg: "劇情/冰店.png",
-        showMangoIceModal: true
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "",
-        text: "（玩家收下伴手禮時，店長注意到玩家手上的神祕地圖。）",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "店長",
-        text: "「咦？這張地圖……我好像在哪裡看過！」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "小丸",
-        text: "「店長，你認識這張地圖嗎？」",
-        marukoImg: "小丸/吉祥物1_舉手開口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "店長",
-        text: "「很久以前，曾經有一位旅人拿著一模一樣的地圖來到這裡。他離開前特別留下一張火車票，並交代我，如果未來有人帶著這張地圖來訪，就把火車票交給對方。」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長.png",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "店長",
-        text: "「我想，這張票應該就是為你們準備的。」",
-        marukoImg: "小丸/吉祥物1_睜眼閉口.png",
-        charImg: "劇情/芒果冰店長_差分.png",
-        bgImg: "劇情/冰店.png",
-        choices: [
-            { 
-                text: "「 原來如此！謝謝店長，我會繼續這趟旅程！」", 
-                speaker: "店長",
-                nextText: "「祝你們一路順利！希望你們能找到地圖背後的祕密！」", 
-                marukoImg: "小丸/吉祥物1_瞇眼開口.png" 
-            },
-            { 
-                text: "「 下一站會是哪裡呢？我已經迫不及待了！」", 
-                speaker: "小丸",
-                nextText: "「嘿嘿！答案就在地圖裡！我們搭上火車，就能前往下一個目的地了！」", 
-                marukoImg: "小丸/吉祥物_跳.png" 
-            }
-        ],
-        showTicketModalAfterChoice: true
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "系統提示",
-        text: "玉井區探索完成！獲得玉井特色伴手禮與下一站火車票！",
-        marukoImg: "小丸/吉祥物_跳.png",
-        charImg: "",
-        bgImg: "劇情/冰店.png"
-    },
-    {
-        title: "五、神祕地圖：下一站的線索",
-        speaker: "小丸",
-        text: "「我們成功找回玉井的色彩了！不過，地圖上還有好多地方等著我們去探索呢！」",
-        marukoImg: "小丸/吉祥物1_彎眉開口.png",
-        charImg: "",
-        bgImg: "劇情/冰店.png"
-    },
-    
-    {
-        title: "五、神祕地圖：前往下一站",
-        speaker: "系統提示",
-        text: "玉井區關卡完成",
-        marukoImg: "",
-        charImg: "",
-        bgImg: "劇情/冰店.png",
-        isFinalStoryEnd: true
-    }
-];
-
 function startStoryFromBook() {
-    if (document.activeElement) document.activeElement.blur();
     document.getElementById('historyBookModal').classList.remove('active');
     document.getElementById('storyModal').classList.add('active');
     currentStoryStep = 0;
     renderStoryStep();
 }
 
+const shanhuaFullScript = [
+    { speaker: "", text: "神秘列車緩緩停靠在新化區。\n玩家與穿著地瓜裝的小丸一起走下列車，街道上飄來陣陣香氣，遠處還傳來炭火燃燒的劈啪聲。", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "" },
+    { speaker: "小丸", text: "「咦？這是什麼味道？聞起來好香喔！好像是剛烤好的地瓜！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "", bgImg: "" },
+    { speaker: "", text: "(循著香氣尋找，小丸和玩家來到一間古早味烤地瓜攤。攤位旁放著一座有些年紀的老烤窯，老闆正皺著眉頭，仔細檢查裡面的地瓜。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分3.png", bgImg: "" },
+    { speaker: "小丸", text: "「老闆，你怎麼愁眉苦臉的？這些地瓜看起來快烤好了呀！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分3.png", bgImg: "" },
+    { speaker: "老闆", text: "「唉，說來不好意思。這座烤窯是我家留下來的老東西，最近我才重新整理好，想烤出以前家裡那種香甜的地瓜。沒想到試了好幾次，不是外皮焦掉，就是裡面還沒熟透。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分3.png", bgImg: "" },
+    { speaker: "小丸", text: "「烤地瓜也有這麼多學問嗎？」", marukoImg: "小丸/吉祥物地瓜裝_閉眼開口.png", managerImg: "地瓜田/地瓜農夫_差分2.png", bgImg: "" },
+    { speaker: "老闆", text: "「當然！火候、翻面的時間，每一樣都很重要。以前家裡的長輩只要看看顏色、聽聽炭火的聲音，就知道什麼時候該翻面。換成我自己來，卻怎麼也抓不準。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分3.png", bgImg: "" },
+    { speaker: "", text: "(小丸好奇地靠近烤窯，發現裡面的地瓜有些已經開始變色，有些卻還是淡黃色。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分2.png", bgImg: "" },
+    { speaker: "小丸", text: "「原來如此！如果翻面時間不對，就可能讓地瓜受熱不均勻。」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「沒錯！我已經浪費了好幾批地瓜，卻還是找不到最適合的烘烤方式。如果今天再失敗，真的不知道該怎麼辦了。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分3.png", bgImg: "" },
+    { speaker: "小丸", text: "「我們來得正是時候！要不要幫老闆一起試試看？」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分2.png", bgImg: "",
+        choices: [
+            { 
+                text: "「聽起來很有趣！我想試試看能不能抓準火候！」", 
+                speaker: "小丸 & 老闆",
+                nextText: "小丸：「嘿嘿！有信心是好事！只要仔細觀察、一步一步來，就有機會成功！」\n\n老闆：「哈哈，有這份幹勁就很好！不過別太心急，烤地瓜最需要的就是耐心。」", 
+                marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png",
+                managerImg: "地瓜田/地瓜農夫.png"
+            },
+            { 
+                text: "「可是我們沒有烤過地瓜耶，真的能幫得上忙嗎？」", 
+                speaker: "小丸 & 老闆",
+                nextText: "小丸：「別擔心！我們可以從最簡單的步驟開始學起，只要仔細觀察，就一定有機會掌握技巧！」\n\n老闆：「沒錯！我第一次學的時候也常常失敗。願意嘗試就很好，我會教你們怎麼做。」", 
+                marukoImg: "小丸/吉祥物地瓜裝_閉眼開口.png",
+                managerImg: "地瓜田/地瓜農夫_差分1.png"
+            }
+        ]
+    },
+    { speaker: "", text: "(老闆看見玩家願意幫忙，便將一個竹籃交給小丸，裡面放著採收用的小鏟子、清洗用的刷子，以及烤地瓜用的長夾。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「既然你們願意幫忙，那就拜託了！不過，地瓜不能直接拿去烤。我們得先從農田裡把地瓜挖出來，再仔細清洗，最後才能放進烤窯。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "小丸", text: "「原來還有這麼多步驟！那我們就從挖地瓜開始吧！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「很好！記得每個步驟都要仔細，因為只要其中一個環節做不好，最後烤出來的地瓜就可能不夠漂亮。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "小丸", text: "「準備好了嗎？新化地瓜職人挑戰，現在開始！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "", triggerGamePhase: 1 },
+
+    { speaker: "小丸", text: "「第一關完成！接下來要把地瓜洗乾淨，才能準備進烤窯喔！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "", bgImg: "" },
+    { speaker: "老闆", text: "「剛挖出來的地瓜還沾著不少泥土，要先清洗乾淨，才能放進烤窯。注意喔，表面和凹陷處的泥巴都要刷掉！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "小丸", text: "「交給我們吧！我要讓每一顆地瓜都乾乾淨淨的！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "", triggerGamePhase: 2 },
+
+    { speaker: "老闆", text: "「做得不錯！地瓜洗乾淨了，接下來就是真正考驗技術的時候了！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "小丸", text: "「最後一關！我們一定要烤出金黃香甜的地瓜！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「前面兩關都完成了，最後就是烘烤。烤地瓜最重要的就是控制火候，並在適當的時間翻面。火太小會烤不熟，火太大又容易烤焦，可要仔細注意喔！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "劇情/冰店.jpg" },
+    { speaker: "小丸", text: "「這次要一顆一顆細心烘烤！讓每一顆都烤得剛剛好！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "", triggerGamePhase: 3 },
+
+    { speaker: "", text: "(老闆小心翼翼地將剛烤好的地瓜夾出來，稍微放涼後，分給玩家與小丸品嚐。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「今天真的多虧了你們！這些地瓜就請你們吃，也算是我謝謝你們的心意。」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "小丸", text: "「謝謝老闆！這可是我們親手幫忙製作的地瓜，吃起來一定特別香甜！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "", text: "(玩家與小丸品嚐著熱呼呼的烤地瓜。外皮微微焦香，剝開後露出綿密柔軟的金黃色果肉。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", propImg: "地瓜田/撥開的地瓜.png", bgImg: "" },
+    { speaker: "", text: "(小丸看了看玩家手中的神秘地圖，發現原本暗淡的新化區已經亮起了金黃色光芒，地圖上還有許多尚未點亮區域。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "" },
+    { speaker: "小丸", text: "「你看！新化區終於亮起來了！看來我們成功完成這裡的探索任務了！」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "" },
+    { speaker: "老闆", text: "「真神奇！這張地圖似乎會隨著你們完成每個地區的任務，逐漸恢復原本的光芒。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "" },
+    { speaker: "", text: "(小丸看着地圖，發現新化區旁邊突然出現了一道微弱的光線，正慢慢延伸到另一個尚未點亮的區域。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "" },
+    { speaker: "小丸", text: "「咦？你們看！地圖好像出現新的路線了！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "地瓜田/地瓜農夫_差分1.png", bgImg: "" },
+    { speaker: "老闆", text: "「看來這張地圖正在一步步帶領你們探索台南。記得，每個地方都有自己的故事和美食，別忘了好好感受這趟旅程。」", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "地瓜田/地瓜農夫.png", bgImg: "",
+        choices: [
+            { 
+                text: "「太好了！我們趕快看看下一站在哪裡吧！」", 
+                speaker: "小丸",
+                nextText: "「嘿嘿！我也很好奇！不知道下一個地方又有什麼好吃的美食在等著我們！」", 
+                marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png" 
+            },
+            { 
+                text: "「沒問題!我們會好好享受這趟旅程」", 
+                speaker: "小丸",
+                nextText: "「對啊！每完成一個地方的探索，地圖就會出現新的變化，感覺就像在解開一個大秘密！」", 
+                marukoImg: "小丸/吉祥物地瓜裝.png" 
+            }
+        ]
+    },
+    { speaker: "", text: "(地圖上的新區域亮起，旁邊同時浮現出一張小小的列車車票。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "", showTicketModal: true },
+    { speaker: "", text: "(小丸興奮地拿起車票，上面清楚印著下一個目的地的名稱。)", marukoImg: "小丸/吉祥物地瓜裝.png", managerImg: "", bgImg: "" },
+    { speaker: "小丸", text: "「太棒了！地圖幫我們找到下一站了！快點，我們趕快去搭列車吧！」", marukoImg: "小丸/吉祥物地瓜裝_睜眼開口.png", managerImg: "", bgImg: "" },
+    {
+        title: "前往下一站",
+        speaker: "系統提示",
+        text: "新化區關卡完成，請準備搭乘火車，展開新的冒險！",
+        marukoImg: "",
+        charImg: "",
+        bgImg: "",
+        isFinalStoryEnd: true
+    }
+];
+
+function initGlobalKeyListener() {
+    window.addEventListener('keydown', function(e) {
+        if (e.key !== 'Enter') return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.repeat) return;
+
+        const gameModal = document.getElementById('gameModal');
+        if (gameModal && gameModal.classList.contains('show')) {
+            closeModal();
+            return;
+        }
+
+        const minigameView = document.getElementById('minigameView');
+        if (minigameView && getComputedStyle(minigameView).display !== 'none') return;
+
+        const historyModal = document.getElementById('historyBookModal');
+        if (historyModal && historyModal.classList.contains('active')) return;
+
+        const storyModal = document.getElementById('storyModal');
+        if (!storyModal || !storyModal.classList.contains('active')) return;
+
+        const choicesEl = document.getElementById('storyChoices');
+        if (choicesEl && getComputedStyle(choicesEl).display !== 'none') return;
+
+        const startPhaseBtn = document.getElementById('startPhaseBtn');
+        if (startPhaseBtn && getComputedStyle(startPhaseBtn).display !== 'none') {
+            startCurrentPhase();
+            return;
+        }
+
+        nextDialogue();
+    }, true);
+}
+
+function handleStoryClick() {
+    const choicesEl = document.getElementById('storyChoices');
+    if (choicesEl && choicesEl.style.display !== 'none') return;
+    const startPhaseBtn = document.getElementById('startPhaseBtn');
+    if (startPhaseBtn && startPhaseBtn.style.display !== 'none') return;
+    nextDialogue();
+}
+
 function startTypewriter(text, onComplete) {
     if (typewriterTimer) clearInterval(typewriterTimer);
-    
     currentFullText = text;
     isTypewriting = true;
     
@@ -299,7 +216,67 @@ function startTypewriter(text, onComplete) {
             isTypewriting = false;
             if (onComplete) onComplete();
         }
-    }, 30);
+    }, 28);
+}
+
+let isChoiceAnswered = false;
+
+function handleStepTextComplete(step) {
+    const speakerEl = document.getElementById('speakerName');
+    const marukoEl = document.getElementById('storyCharMaruko');
+    const managerEl = document.getElementById('storyCharManager');
+    const choicesEl = document.getElementById('storyChoices');
+    const nextBtn = document.getElementById('nextDialogueBtn');
+    const startPhaseBtn = document.getElementById('startPhaseBtn');
+
+    if (step.choices && !isChoiceAnswered) {
+        choicesEl.innerHTML = '';
+        choicesEl.style.display = 'flex';
+        step.choices.forEach(c => {
+            const btn = document.createElement('button');
+            btn.className = 'story-choice-btn';
+            btn.innerText = c.text;
+            btn.onclick = (event) => {
+                event.stopPropagation();
+                isChoiceAnswered = true;
+                choicesEl.innerHTML = '';
+                choicesEl.style.display = 'none';
+
+                if (c.speaker !== undefined) {
+                    if (c.speaker.trim() === "") {
+                        speakerEl.style.display = 'none';
+                    } else {
+                        speakerEl.innerText = c.speaker;
+                        speakerEl.style.display = 'block';
+                    }
+                }
+                if (c.marukoImg) marukoEl.src = c.marukoImg;
+                if (c.managerImg) managerEl.src = c.managerImg;
+
+                startTypewriter(c.nextText, () => {
+                    nextBtn.style.display = 'inline-block';
+                });
+            };
+            choicesEl.appendChild(btn);
+        });
+    } else if (step.triggerGamePhase) {
+        activePhase = step.triggerGamePhase;
+        startPhaseBtn.style.display = 'inline-block';
+    } else if (step.propImg) {
+        modalDelayTimer = setTimeout(() => {
+            modalDelayTimer = null;
+            showRewardModal('potato');
+            nextBtn.style.display = 'inline-block';
+        }, 900);
+    } else if (step.showTicketModal) {
+        modalDelayTimer = setTimeout(() => {
+            modalDelayTimer = null;
+            showRewardModal('ticket');
+            nextBtn.style.display = 'inline-block';
+        }, 900);
+    } else {
+        nextBtn.style.display = 'inline-block';
+    }
 }
 
 function renderStoryStep() {
@@ -308,470 +285,829 @@ function renderStoryStep() {
         clearTimeout(modalDelayTimer);
         modalDelayTimer = null;
     }
-    const step = storyScript[currentStoryStep];
-    document.getElementById('storyTitle').innerText = step.title;
-    document.getElementById('speakerName').innerText = step.speaker;
-    
-    if (step.bgImg) document.getElementById('storyBg').src = step.bgImg;
-
-    const marukoEl = document.getElementById('storyCharMaruko');
-    if (marukoEl) {
-        if (step.marukoImg) {
-            marukoEl.src = step.marukoImg;
-            marukoEl.style.display = 'block';
-        } else {
-            marukoEl.style.display = 'none';
-        }
-    }
-
-    const charEl = document.getElementById('storyChar');
-    if (step.charImg) {
-        charEl.src = step.charImg;
-        charEl.style.display = 'block';
-    } else {
-        charEl.style.display = 'none';
-    }
-
+    const step = shanhuaFullScript[currentStoryStep];
+    const speakerEl = document.getElementById('speakerName');
     const choicesEl = document.getElementById('storyChoices');
     const nextBtn = document.getElementById('nextDialogueBtn');
-    const startGameBtn = document.getElementById('startMinigameFromStoryBtn');
+    const startPhaseBtn = document.getElementById('startPhaseBtn');
+
+    if (!step.speaker || step.speaker.trim() === "" || step.text.startsWith("（")) {
+        speakerEl.style.display = 'none';
+    } else {
+        speakerEl.innerText = step.speaker;
+        speakerEl.style.display = 'block';
+    }
+    
+    const marukoEl = document.getElementById('storyCharMaruko');
+    if (step.marukoImg) {
+        marukoEl.src = step.marukoImg;
+        marukoEl.style.display = 'block';
+    } else {
+        marukoEl.style.display = 'none';
+    }
+
+    const managerEl = document.getElementById('storyCharManager');
+    if (step.managerImg) {
+        managerEl.src = step.managerImg;
+        managerEl.style.display = 'block';
+    } else {
+        managerEl.style.display = 'none';
+    }
+
+    const propDisplayEl = document.getElementById('storyPropDisplay');
+    if (propDisplayEl) propDisplayEl.style.display = 'none';
 
     choicesEl.style.display = 'none';
     nextBtn.style.display = 'none';
-    startGameBtn.style.display = 'none';
+    startPhaseBtn.style.display = 'none';
 
     startTypewriter(step.text, () => {
-        if (step.choices) {
-            choicesEl.innerHTML = '';
-            choicesEl.style.display = 'flex';
-
-            step.choices.forEach(c => {
-                const btn = document.createElement('button');
-                btn.className = 'story-choice-btn';
-                btn.innerText = c.text;
-                btn.onclick = (event) => {
-                    event.stopPropagation();
-                    btn.blur();
-                    isChoiceAnswered = true;
-                    if (c.speaker !== undefined) {
-                        document.getElementById('speakerName').innerText = c.speaker;
-                    }
-                    if (c.marukoImg && marukoEl) marukoEl.src = c.marukoImg;
-                    if (c.charImg) charEl.src = c.charImg;
-                    choicesEl.innerHTML = '';
-                    choicesEl.style.display = 'none';
-
-                    startTypewriter(c.nextText, () => {
-                        if (step.showTicketModalAfterChoice) {
-                            setTimeout(() => {
-                                showRewardModal('ticket');
-                            }, 600);
-                        } else {
-                            nextBtn.style.display = 'inline-block';
-                        }
-                    });
-                };
-                choicesEl.appendChild(btn);
-            });
-        } else if (step.isGameTrigger) {
-            startGameBtn.style.display = 'inline-block';
-        } else if (step.showMangoIceModal) {
-            setTimeout(() => {
-                showRewardModal('mangoIce');
-            }, 600);
-        } else {
-            nextBtn.style.display = 'inline-block';
-        }
+        handleStepTextComplete(step);
     });
 }
 
+let lastEnterTime = 0;
+
 function nextDialogue(e) {
     if (e) e.stopPropagation();
-    
-    if (modalDelayTimer) return;
+    const now = Date.now();
+    if (now - lastEnterTime < 180) return;
+    lastEnterTime = now;
 
-    const step = storyScript[currentStoryStep];
+    if (modalDelayTimer) return;
+    const step = shanhuaFullScript[currentStoryStep];
 
     if (isTypewriting) {
         if (typewriterTimer) clearInterval(typewriterTimer);
         typewriterTimer = null;
         isTypewriting = false;
         document.getElementById('dialogueText').innerText = currentFullText;
-        
-        const nextBtn = document.getElementById('nextDialogueBtn');
-        const startGameBtn = document.getElementById('startMinigameFromStoryBtn');
-        const choicesEl = document.getElementById('storyChoices');
-        const marukoEl = document.getElementById('storyCharMaruko');
-        const charEl = document.getElementById('storyChar');
-        
-        if (step.choices && !isChoiceAnswered) {
-            choicesEl.innerHTML = '';
-            choicesEl.style.display = 'flex';
-            step.choices.forEach(c => {
-                const btn = document.createElement('button');
-                btn.className = 'story-choice-btn';
-                btn.innerText = c.text;
-                btn.onclick = (event) => {
-                    event.stopPropagation();
-                    btn.blur();
-                    isChoiceAnswered = true;
-                    if (c.speaker !== undefined) {
-                        document.getElementById('speakerName').innerText = c.speaker;
-                    }
-                    if (c.marukoImg && marukoEl) marukoEl.src = c.marukoImg;
-                    if (c.charImg) charEl.src = c.charImg;
-                    choicesEl.innerHTML = '';
-                    choicesEl.style.display = 'none';
-
-                    startTypewriter(c.nextText, () => {
-                        if (step.showTicketModalAfterChoice) {
-                            modalDelayTimer = setTimeout(() => {
-                                modalDelayTimer = null;
-                                showRewardModal('ticket');
-                            }, 600);
-                        } else {
-                            nextBtn.style.display = 'inline-block';
-                        }
-                    });
-                };
-                choicesEl.appendChild(btn);
-            });
-        } else if (step.isGameTrigger) {
-            startGameBtn.style.display = 'inline-block';
-        } else if (step.showMangoIceModal) {
-            modalDelayTimer = setTimeout(() => {
-                modalDelayTimer = null;
-                showRewardModal('mangoIce');
-            }, 600);
-        } else if (step.showTicketModalAfterChoice && isChoiceAnswered) {
-            modalDelayTimer = setTimeout(() => {
-                modalDelayTimer = null;
-                showRewardModal('ticket');
-            }, 600);
-        } else {
-            nextBtn.style.display = 'inline-block';
-        }
+        handleStepTextComplete(step);
         return;
     }
 
-    if (step.choices && !isChoiceAnswered) return;
+    const choicesEl = document.getElementById('storyChoices');
+    const startPhaseBtn = document.getElementById('startPhaseBtn');
+    if ((choicesEl && choicesEl.style.display !== 'none') ||
+        (startPhaseBtn && startPhaseBtn.style.display !== 'none')) {
+        return;
+    }
 
-    if (step.isFinalStoryEnd) {
-        document.getElementById('storyModal').classList.remove('active');
-        finishRegionAndReturnMap();
+    if (step && step.isFinalStoryEnd) {
+        finishShanhuaAndReturnMap();
         return;
     }
 
     currentStoryStep++;
-    if (currentStoryStep < storyScript.length) {
+    if (currentStoryStep < shanhuaFullScript.length) {
         renderStoryStep();
     }
 }
 
+function finishShanhuaAndReturnMap() {
+    clearInterval(timerInterval);
+    stopNeedleLoop();
+    clearToolCursors();
+    if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'STAGE_CLEARED', region: '新化' }, '*');
+        return;
+    }
+    document.getElementById('storyModal').classList.remove('active');
+    document.getElementById('minigameView').style.display = 'none';
+    resetBookPage();
+    document.getElementById('historyBookModal').classList.add('active');
+}
+
+function startCurrentPhase(e) {
+    if (e) e.stopPropagation();
+    if (document.activeElement) document.activeElement.blur();
+
+    const startPhaseBtn = document.getElementById('startPhaseBtn');
+    if (startPhaseBtn) startPhaseBtn.style.display = 'none';
+
+    document.getElementById('storyModal').classList.remove('active');
+    document.getElementById('minigameView').style.display = 'flex';
+
+    document.getElementById('stage1Area').style.display = 'none';
+    document.getElementById('stage2Area').style.display = 'none';
+    document.getElementById('stage3Area').style.display = 'none';
+
+    showGameInstructionModal();
+}
+
 function showGameInstructionModal(e) {
     if (e) e.stopPropagation();
-    document.getElementById('modalTitle').innerText = '採芒果挑戰說明';
-    document.getElementById('modalText').innerHTML = `
-        <div style="text-align:left; line-height:1.7;">
-            <p style="color:#ffd700; font-weight:bold; margin-bottom:8px;">【操作簡介】</p>
-            <p>1. 使用鍵盤 <b>A / D</b> 或 <b>左 / 右方向鍵</b> 移動籃子。</p>
-            <p>2. 接住掉落的 <b>芒果</b>（成功收集 5 顆即可通關）。</p>
-            <p>3. 接錯其他水果會扣除愛心生命數，扣完則挑戰失敗！</p>
-        </div>
-    `;
+
+    const imgWrap = document.getElementById('modalImgWrap');
+    if (imgWrap) imgWrap.style.display = 'none';
+
+    if (activePhase === 1) {
+        document.getElementById('modalTitle').innerText = '第一關：挖地瓜挑戰說明';
+        document.getElementById('modalText').innerHTML = `
+            <div style="text-align:left; line-height:1.8;">
+                <p style="color:#ffd700; font-weight:bold; margin-bottom:8px;">【操作簡介】</p>
+                <p>1. 先點擊右下角 <b>「鏟子圖標」</b> 裝備鏟子。</p>
+                <p>2. 點擊土堆<b>一次</b>，鏟子會自動挖開土層露出地瓜。</p>
+                <p>3. 用滑鼠<b>按住地瓜往上拖拉</b>，拉出來即可在 <b>60秒內採收 4 顆地瓜</b>！</p>
+            </div>
+        `;
+    } else if (activePhase === 2) {
+        document.getElementById('modalTitle').innerText = '第二關：地瓜清潔說明';
+        document.getElementById('modalText').innerHTML = `
+            <div style="text-align:left; line-height:1.8;">
+                <p style="color:#ffd700; font-weight:bold; margin-bottom:8px;">【操作簡介】</p>
+                <p>1. 先點擊右下角 <b>「刷子圖標」</b></p>
+                <p>2. <b>一顆一顆依序清洗</b></p>
+                <p>3. 將 <b>4 顆地瓜</b> 刷洗成乾淨的樣子即可通關！</p>
+            </div>
+        `;
+    } else if (activePhase === 3) {
+        document.getElementById('modalTitle').innerText = '第三關：火候大師挑戰說明';
+        document.getElementById('modalText').innerHTML = `
+            <div style="text-align:left; line-height:1.8;">
+                <p style="color:#ffd700; font-weight:bold; margin-bottom:8px;">【操作簡介】</p>
+                <p>1. 左側直立溫度計中，<b>請按下方按鈕維持在黃色區。</b></p>
+                <p>2. <b>一顆一顆烘烤</b>，共有 <b>5 種熟度階段</b>，熟度達 <b>50%</b>時記得<b>點擊地瓜翻面</b>。</p>
+                <p>3. 完美烤熟 <b>3 顆地瓜</b> 即可通關！</p>
+            </div>
+        `;
+    }
+
     document.getElementById('modalBtn').innerText = '開始遊戲';
     pendingAction = 'startMinigameFromModal';
     document.getElementById('gameModal').classList.add('show');
 }
-function startMinigameFromStory() {
-    document.getElementById('storyModal').classList.remove('active');
-    startMinigame();
+
+/* ==================== 第一關：先點鏟子 -> 點一次土堆自動挖開 -> 按住往上拉晃動拔出 (60秒) ==================== */
+let timerInterval;
+let gameTimeLeft = 60;
+let isShovelEquipped = false;
+
+function equipShovel() {
+    isShovelEquipped = true;
+    document.body.classList.add('cursor-shovel');
+    const tool = document.getElementById('shovelTool');
+    const label = document.getElementById('shovelToolLabel');
+    const hint = document.getElementById('stage1Hint');
+    if (tool) tool.classList.add('equipped');
+    if (label) label.innerText = '已裝備鏟子';
+    if (hint) hint.innerText = '點擊土堆挖開土層，露出地瓜後「按住往上拖拉」拔出！';
 }
 
-function showRewardModal(type) {
-    if (type === 'mangoIce') {
-        document.getElementById('modalTitle').innerText = '獲得招牌芒果冰！';
-        document.getElementById('modalText').innerHTML = `
-            <div style="text-align:center;">
-                <img src="劇情/芒果冰.jpg" style="height:220px; object-fit:contain; margin-bottom:10px;" alt="芒果冰" onerror="this.src='劇情/芒果冰.png'">
-                <p>店長送給你一碗香甜可口的【玉井招牌芒果冰】！</p>
-            </div>
-        `;
-        document.getElementById('modalBtn').innerText = '收下';
-        pendingAction = 'continueStoryAfterReward';
-    } else if (type === 'ticket') {
-        document.getElementById('modalTitle').innerText = '獲得神秘火車票！';
-        document.getElementById('modalText').innerHTML = `
-            <div style="text-align:center;">
-                <img src="劇情/車票_新化.png" style="height:220px; object-fit:contain; margin-bottom:10px;" alt="火車票">
-                <p>獲得代表【新化站】的神祕火車票</p>
-            </div>
-        `;
-        document.getElementById('modalBtn').innerText = '收下';
-        pendingAction = 'continueStoryAfterReward';
+function initStage1() {
+    clearToolCursors();
+    isShovelEquipped = false;
+
+    document.getElementById('stageTitle').innerText = "第一關：地瓜採收大作戰";
+    document.getElementById('stage1Area').style.display = 'flex';
+    document.getElementById('stage2Area').style.display = 'none';
+    document.getElementById('stage3Area').style.display = 'none';
+    document.getElementById('timerBox').style.display = 'block';
+
+    const tool = document.getElementById('shovelTool');
+    const label = document.getElementById('shovelToolLabel');
+    const hint = document.getElementById('stage1Hint');
+    if (tool) tool.classList.remove('equipped');
+    if (label) label.innerText = '點擊裝備鏟子';
+    if (hint) hint.innerText = '請先點擊右下角「鏟子圖標」！';
+
+    gameTimeLeft = 60;
+    gameStats.harvested = 0;
+    document.getElementById('timerText').innerText = gameTimeLeft;
+    document.getElementById('scoreText').innerText = `0 / 4`;
+
+    const grid = document.getElementById('dirtGrid');
+    grid.innerHTML = '';
+
+    const moundData = [
+        { type: 'potato', state: 'hidden' },
+        { type: 'stone',  state: 'hidden' },
+        { type: 'potato', state: 'hidden' },
+        { type: 'empty',  state: 'hidden' },
+        { type: 'potato', state: 'hidden' },
+        { type: 'stone',  state: 'hidden' },
+        { type: 'potato', state: 'hidden' },
+        { type: 'empty',  state: 'hidden' }
+    ];
+
+    moundData.forEach((data, index) => {
+        const el = document.createElement('div');
+        el.className = 'dirt-mound';
+        el.innerHTML = `🌱 土堆 ${index + 1}`;
+        el.onclick = () => handleMoundClick(el, data);
+        grid.appendChild(el);
+    });
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        gameTimeLeft--;
+        document.getElementById('timerText').innerText = gameTimeLeft;
+        if (gameTimeLeft <= 0) {
+            clearInterval(timerInterval);
+            checkStage1Result();
+        }
+    }, 1000);
+}
+
+function handleMoundClick(el, data) {
+    if (data.state !== 'hidden') return;
+
+    if (!isShovelEquipped) {
+        const hint = document.getElementById('stage1Hint');
+        if (hint) hint.innerText = '請先點擊右下角的「鏟子圖標」才能挖土喔！';
+        return;
     }
-    document.getElementById('gameModal').classList.add('show');
+
+    data.state = 'digging';
+    el.classList.add('dug-open');
+    el.innerHTML = `
+        <img src="地瓜田/鏟子.png" class="auto-dig-shovel" alt="挖掘動畫">
+        <span style="color:#ffd700; font-weight:bold;">挖掘中...</span>
+    `;
+
+    setTimeout(() => {
+        if (data.type === 'potato') {
+            data.state = 'revealed';
+            el.innerHTML = `
+                <img src="地瓜田/剛拔出來的地瓜.png" class="pullable-potato" alt="地瓜">
+                <div class="mound-hint-text">⬆按住往上拉拔出！</div>
+            `;
+            const potatoImg = el.querySelector('.pullable-potato');
+            attachPullUpHandler(el, potatoImg, data);
+        } else if (data.type === 'stone') {
+            data.state = 'done';
+            el.innerHTML = `<div style="font-size:40px;">🪨</div><small style="color:#ccc;">挖到石頭了</small>`;
+        } else {
+            data.state = 'done';
+            el.innerHTML = `<small style="color:#bbb;">空的土堆</small>`;
+        }
+    }, 550);
 }
 
-function startMinigame() {
-    document.getElementById('minigameView').style.display = 'block';
-    document.body.classList.add('hide-cursor');
-    initGame();
+function attachPullUpHandler(moundEl, potatoImg, data) {
+    let isDragging = false;
+    let startY = 0;
+
+    const onPointerDown = (e) => {
+        if (data.state !== 'revealed') return;
+        e.stopPropagation();
+        e.preventDefault();
+        isDragging = true;
+        startY = e.clientY;
+        potatoImg.classList.add('pulling');
+        if (potatoImg.setPointerCapture) {
+            potatoImg.setPointerCapture(e.pointerId);
+        }
+    };
+
+    const onPointerMove = (e) => {
+        if (!isDragging || data.state !== 'revealed') return;
+        const deltaY = e.clientY - startY;
+        const clampedY = Math.max(-75, Math.min(10, deltaY));
+        potatoImg.style.setProperty('--pull-y', `${clampedY}px`);
+        potatoImg.style.transform = `translateY(${clampedY}px)`;
+
+        if (clampedY <= -48) {
+            isDragging = false;
+            data.state = 'done';
+            potatoImg.classList.remove('pulling');
+            gameStats.harvested++;
+            document.getElementById('scoreText').innerText = `${gameStats.harvested} / 4`;
+            moundEl.innerHTML = `成功拔出地瓜！`;
+            moundEl.style.opacity = '0.65';
+
+            if (gameStats.harvested >= 4) {
+                clearInterval(timerInterval);
+                setTimeout(checkStage1Result, 350);
+            }
+        }
+    };
+
+    const onPointerUp = () => {
+        if (!isDragging) return;
+        isDragging = false;
+        potatoImg.classList.remove('pulling');
+        if (data.state === 'revealed') {
+            potatoImg.style.setProperty('--pull-y', '0px');
+            potatoImg.style.transform = 'translateY(0px)';
+        }
+    };
+
+    potatoImg.addEventListener('pointerdown', onPointerDown);
+    potatoImg.addEventListener('pointermove', onPointerMove);
+    potatoImg.addEventListener('pointerup', onPointerUp);
+    potatoImg.addEventListener('pointercancel', onPointerUp);
 }
 
-let gameInterval, fruitSpawner;
-let playerX = 330;
-let playerY = 390;
-const playerSpeed = 7;
-let lives = 3;
-let mangoCount = 0;
-const targetMango = 5;
-let keys = {};
-let fruits = [];
-let collectedFruitList = [];
-let isGameOverState = false;
-
-const fruitTypes = [
-    { name: '芒果', img: '水果關卡/芒果.png', isMango: true },
-    { name: '草莓', img: '水果關卡/草莓.png', isMango: false },
-    { name: '香蕉', img: '水果關卡/香蕉.png', isMango: false },
-    { name: '葡萄', img: '水果關卡/葡萄.png', isMango: false },
-    { name: '蘋果', img: '水果關卡/蘋果.png', isMango: false }
-];
-
-function initGame() {
-    lives = 3;
-    mangoCount = 0;
-    const container = document.getElementById('minigameView');
-    const viewWidth = container ? container.clientWidth : window.innerWidth;
-    const viewHeight = container ? container.clientHeight : window.innerHeight;
-
-    playerX = (viewWidth - 240) / 2;
-    playerY = viewHeight - 250;
-    collectedFruitList = [];
-    keys = {};
-    isGameOverState = false;
-    updateHUD();
-    
-    window.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('keyup', handleKeyUp);
-    window.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('keyup', handleKeyUp);
-
-    clearInterval(fruitSpawner);
-    cancelAnimationFrame(gameInterval);
-    fruitSpawner = setInterval(spawnFruits, 1200);
-    gameInterval = requestAnimationFrame(updateGame);
-}
-
-function handleKeyDown(e) { keys[e.key.toLowerCase()] = true; }
-function handleKeyUp(e) { keys[e.key.toLowerCase()] = false; }
-
-function spawnFruits() {
-    const container = document.getElementById('minigameView');
-    if (!container || container.style.display === 'none' || isGameOverState) return;
-    
-    const viewWidth = container.clientWidth || window.innerWidth;
-    const count = Math.floor(Math.random() * 2) + 1;
-    let spawnedXList = [];
-
-    for (let i = 0; i < count; i++) {
-        let startX;
-        let attempts = 0;
-        
-        do {
-            startX = 40 + Math.random() * Math.max(100, viewWidth - 180);
-            attempts++;
-        } while (
-            spawnedXList.some(x => Math.abs(x - startX) < 150) && attempts < 15
-        );
-
-        spawnedXList.push(startX);
-
-        const fruit = document.createElement('div');
-        fruit.className = 'falling-fruit';
-        
-        const randomFruit = fruitTypes[Math.floor(Math.random() * fruitTypes.length)];
-        fruit.style.left = startX + 'px';
-        fruit.style.top = '-100px';
-        
-        fruit.innerHTML = `<img src="${randomFruit.img}" alt="${randomFruit.name}">`;
-        container.appendChild(fruit);
-
-        fruits.push({
-            element: fruit,
-            x: startX,
-            y: -100,
-            speed: 1.5 + Math.random() * 0.9,
-            isMango: randomFruit.isMango,
-            img: randomFruit.img
+function checkStage1Result() {
+    clearToolCursors();
+    if (gameStats.harvested >= 4) {
+        showModal("第一關挑戰成功！", `太好了！在時間內成功拔出 ${gameStats.harvested} 顆地瓜！`, "準備進入清洗階段！", () => {
+            document.getElementById('minigameView').style.display = 'none';
+            document.getElementById('storyModal').classList.add('active');
+            nextDialogue();
         });
+    } else {
+        showModal(" 採收失敗", "時間到了，但採收的地瓜不足 4 顆！", "重新開始", initStage1);
     }
 }
 
-function updateGame() {
-    if (isGameOverState) return;
-    const container = document.getElementById('minigameView');
-    const containerWidth = container ? container.clientWidth : window.innerWidth;
-    const containerHeight = container ? container.clientHeight : window.innerHeight;
+/* ==================== 第二關：一開始是圖1(髒掉的地瓜_2.png)，移動滑鼠刷洗降低髒污透明度變成圖2(生地瓜.png) ==================== */
+let isBrushEquipped = false;
+let currentWashIndex = 0;
 
-    if (keys['a'] || keys['arrowleft']) playerX -= playerSpeed;
-    if (keys['d'] || keys['arrowright']) playerX += playerSpeed;
+function equipBrush() {
+    isBrushEquipped = true;
+    document.body.classList.add('cursor-brush');
+    const tool = document.getElementById('spongeTool');
+    const label = document.getElementById('brushToolLabel');
+    const hint = document.getElementById('stage2Hint');
+    if (tool) tool.classList.add('equipped');
+    if (label) label.innerText = '刷子使用中';
+    if (hint) hint.innerText = ' 移動滑鼠刷洗地瓜表面，刷子會隨之晃動並清除髒污！';
+}
 
-    playerX = Math.max(0, Math.min(containerWidth - 240, playerX));
-    playerY = containerHeight - 250;
+function initStage2() {
+    clearToolCursors();
+    isBrushEquipped = false;
+    currentWashIndex = 0;
+    gameStats.cleaned = 0;
 
-    const catEl = document.getElementById('playerCat');
-    if (catEl) {
-        catEl.style.left = playerX + 'px';
-        catEl.style.top = playerY + 'px';
+    document.getElementById('stageTitle').innerText = "第二關：地瓜清潔任務";
+    document.getElementById('stage1Area').style.display = 'none';
+    document.getElementById('stage2Area').style.display = 'flex';
+    document.getElementById('stage3Area').style.display = 'none';
+
+    document.getElementById('timerBox').style.display = 'none';
+    document.getElementById('scoreText').innerText = `0 / 4`;
+
+    const tool = document.getElementById('spongeTool');
+    const label = document.getElementById('brushToolLabel');
+    const hint = document.getElementById('stage2Hint');
+    if (tool) tool.classList.remove('equipped');
+    if (label) label.innerText = '點擊裝備刷子';
+    if (hint) hint.innerText = ' 請先點擊右下角「刷子圖標」，再移動滑鼠刷洗地瓜！';
+
+    renderSingleWashPotato();
+}
+
+function renderSingleWashPotato() {
+    const container = document.getElementById('washContainer');
+    container.innerHTML = '';
+
+    const card = document.createElement('div');
+    card.className = 'single-potato-card';
+
+    // 圖2：洗好的乾淨生地瓜（底層）
+    const cleanImg = document.createElement('img');
+    cleanImg.src = '地瓜田/生地瓜.png';
+    cleanImg.className = 'single-clean-potato';
+    cleanImg.id = 'singleCleanPotato';
+    cleanImg.alt = '洗好的生地瓜';
+
+    // 圖1：髒掉的地瓜_2.png 畫布（上層，滑鼠滑過降低該處髒污透明度）
+    const canvas = document.createElement('canvas');
+    canvas.width = 260;
+    canvas.height = 260;
+    canvas.className = 'dirty-potato-canvas';
+    const ctx = canvas.getContext('2d');
+
+    const dirtyImg = new Image();
+    dirtyImg.src = '地瓜田/髒掉的地瓜.png';
+    dirtyImg.onload = () => {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(dirtyImg, 0, 0, canvas.width, canvas.height);
+    };
+
+    const zones = [
+        { x: 105, y: 60,  opacity: 1.0 },
+        { x: 118, y: 100, opacity: 1.0 },
+        { x: 130, y: 135, opacity: 1.0 },
+        { x: 140, y: 175, opacity: 1.0 },
+        { x: 150, y: 215, opacity: 1.0 }
+    ];
+
+    let isCompleted = false;
+    let lastScrubTime = 0;
+    let lastBrushAnimTime = 0;
+    let lastX = null;
+    let lastY = null;
+
+    // 只有當玩家移動滑鼠時才會觸發刷子晃動與降低髒污透明度
+    const handleScrubMove = (e) => {
+        if (isCompleted) return;
+
+        if (!isBrushEquipped) {
+            const hint = document.getElementById('stage2Hint');
+            if (hint) hint.innerText = ' 請先點擊右下角的「刷子圖標」！';
+            return;
+        }
+
+        const now = performance.now();
+        if (lastX !== null && Math.hypot(e.clientX - lastX, e.clientY - lastY) < 4) return;
+        if (now - lastScrubTime < 42) return;
+        lastScrubTime = now;
+        lastX = e.clientX;
+        lastY = e.clientY;
+
+        if (now - lastBrushAnimTime > 160) {
+            lastBrushAnimTime = now;
+            spawnScrubBrushEffect(e.clientX, e.clientY);
+        }
+
+        const rect = canvas.getBoundingClientRect();
+        const moveX = ((e.clientX - rect.left) / rect.width) * canvas.width;
+        const moveY = ((e.clientY - rect.top) / rect.height) * canvas.height;
+
+        // 降低被清洗處的髒污透明度，逐步顯現底層圖2（生地瓜.png）
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-out';
+        const grad = ctx.createRadialGradient(moveX, moveY, 8, moveX, moveY, 48);
+        grad.addColorStop(0, 'rgba(0, 0, 0, 0.28)');
+        grad.addColorStop(0.7, 'rgba(0, 0, 0, 0.15)');
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(moveX, moveY, 48, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        zones.forEach(z => {
+            const dist = Math.hypot(moveX - z.x, moveY - z.y);
+            if (dist < 58 && z.opacity > 0) {
+                z.opacity = Math.max(0, +(z.opacity - 0.14).toFixed(2));
+            }
+        });
+
+        const remainSum = zones.reduce((acc, z) => acc + z.opacity, 0);
+        const cleanPercent = Math.round((1 - remainSum / zones.length) * 100);
+        const badge = document.getElementById('singleWashBadge');
+        if (badge) badge.innerText = `第 ${currentWashIndex + 1} / 4 顆地瓜 － 清潔度：${cleanPercent}%`;
+
+        if (remainSum <= 0) {
+            isCompleted = true;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            cleanImg.classList.add('sparkle');
+            if (badge) badge.innerText = `✨ 第 ${currentWashIndex + 1} 顆地瓜洗淨完成！`;
+
+            gameStats.cleaned++;
+            document.getElementById('scoreText').innerText = `${gameStats.cleaned} / 4`;
+
+            setTimeout(() => {
+                currentWashIndex++;
+                if (currentWashIndex < 4) {
+                    renderSingleWashPotato();
+                } else {
+                    checkStage2Result();
+                }
+            }, 650);
+        }
+    };
+
+    canvas.addEventListener('pointermove', handleScrubMove);
+
+    card.appendChild(cleanImg);
+    card.appendChild(canvas);
+
+    const badge = document.createElement('div');
+    badge.className = 'wash-progress-badge';
+    badge.id = 'singleWashBadge';
+    badge.innerText = `第 ${currentWashIndex + 1} / 4 顆地瓜 － 清潔度：0%`;
+
+    container.appendChild(card);
+    container.appendChild(badge);
+}
+
+function spawnScrubBrushEffect(x, y) {
+    const brush = document.createElement('img');
+    brush.src = '地瓜田/洗具刷子.png';
+    brush.className = 'floating-scrub-brush';
+    brush.style.left = `${x}px`;
+    brush.style.top = `${y}px`;
+    document.body.appendChild(brush);
+    setTimeout(() => brush.remove(), 310);
+}
+
+function checkStage2Result() {
+    clearToolCursors();
+    showModal("洗滌完成！", "4 顆地瓜都已經洗得乾乾淨淨囉！", "準備送進老烤窯！", () => {
+        document.getElementById('minigameView').style.display = 'none';
+        document.getElementById('storyModal').classList.add('active');
+        document.getElementById('timerBox').style.display = 'block';
+        nextDialogue();
+    });
+}
+
+/* ==================== 第三關：左邊直立溫度計(轉90度)、右邊地瓜(5種熟度.png)、下面按鈕 ==================== */
+// 烤箱溫度計2.png 轉 90 度後：
+// 0~18% 與 82~100% 為兩端綠色(火太小)
+// 19~36% 與 64~81% 為黃色(火候剛好)
+// 37~63% 為中央橘紅色(火太大)
+let tempVal = 28;
+let targetTemp = 28;
+let tempDriftSpeed = 0;
+let needleAnimId = null;
+let lastNeedleTime = 0;
+let nextChangeTime = 0;
+let currentOvenIndex = 0;
+let currentOvenItem = null;
+
+function stopNeedleLoop() {
+    if (needleAnimId) {
+        cancelAnimationFrame(needleAnimId);
+        needleAnimId = null;
+    }
+}
+
+function getTempZone(val) {
+    if (val <= 18 || val >= 82) return 'green';  // 兩端綠色：火太小
+    if (val >= 38 && val <= 62) return 'red';    // 中央紅色：火太大
+    return 'yellow';                             // 黃色區：火候剛好
+}
+
+function updateNeedleDisplay() {
+    const pointerEl = document.getElementById('tempPointer');
+    if (pointerEl) {
+        // 對應溫度計綠框範圍（left: 11% ~ 89%）
+        const leftPercent = 11 + (tempVal / 100) * 78;
+        pointerEl.style.left = `${leftPercent}%`;
     }
 
-    for (let i = fruits.length - 1; i >= 0; i--) {
-        let f = fruits[i];
-        f.y += f.speed;
-        f.element.style.top = f.y + 'px';
+    const zone = getTempZone(tempVal);
+    const statusTextEl = document.getElementById('tempStatusText');
+    if (statusTextEl) {
+        if (zone === 'green') {
+            statusTextEl.style.color = '#a3e635';
+            statusTextEl.innerText = "🟢 綠色區：火太小！";
+        } else if (zone === 'yellow') {
+            statusTextEl.style.color = '#facc15';
+            statusTextEl.innerText = "🟡 黃色區：火候剛好！";
+        } else {
+            statusTextEl.style.color = '#ef4444';
+            statusTextEl.innerText = "🔴 紅色區：火太大！";
+        }
+    }
+}
 
-        const fruitCenterX = f.x + 50; 
-        const fruitCenterY = f.y + 50;
+function startIrregularNeedleLoop() {
+    stopNeedleLoop();
+    lastNeedleTime = performance.now();
+    nextChangeTime = lastNeedleTime + 450;
 
-        if (
-            fruitCenterY >= playerY + 10 &&
-            fruitCenterY <= playerY + 75 &&
-            fruitCenterX >= playerX + 35 &&
-            fruitCenterX <= playerX + 195
-        ) {
-            if (f.isMango) {
-                mangoCount++;
-                collectedFruitList.push(f.img);
-                updateHUD();
+    function loop(now) {
+        const dt = Math.min((now - lastNeedleTime) / 1000, 0.1);
+        lastNeedleTime = now;
 
-                f.element.remove();
-                fruits.splice(i, 1);
+        if (now >= nextChangeTime) {
+            // 指針會隨機往中央紅區(火太大)或兩端綠區(火太小)偏移
+            const r = Math.random();
+            if (r < 0.55) {
+                targetTemp = 42 + Math.random() * 16; // 往中央紅區
+            } else if (r < 0.78) {
+                targetTemp = 3 + Math.random() * 13;  // 往下端綠區
+            } else {
+                targetTemp = 84 + Math.random() * 13; // 往上端綠區
+            }
+            tempDriftSpeed = 22 + Math.random() * 28;
+            nextChangeTime = now + (450 + Math.random() * 550);
+        }
 
-                if (mangoCount >= targetMango) {
-                    isGameOverState = true;
-                    cancelAnimationFrame(gameInterval);
-                    clearInterval(fruitSpawner);
-                    gameWin();
-                    return;
+        const diff = targetTemp - tempVal;
+        const step = Math.sign(diff) * Math.min(Math.abs(diff), tempDriftSpeed * dt);
+        const jitter = (Math.random() - 0.5) * 24 * dt;
+
+        tempVal = Math.max(2, Math.min(98, tempVal + step + jitter));
+        updateNeedleDisplay();
+
+        needleAnimId = requestAnimationFrame(loop);
+    }
+
+    needleAnimId = requestAnimationFrame(loop);
+}
+
+// 5 種熟度階段（全部使用 .png 檔名）
+function updatePotatoDonenessVisual(item) {
+    const imgEl = document.getElementById('singleOvenImg');
+    const badgeEl = document.getElementById('singleOvenBadge');
+    const slotEl = document.getElementById('singleOvenSlot');
+    if (!imgEl || !badgeEl || !slotEl) return;
+
+    if (item.status === 'burnt') {
+        imgEl.style.filter = 'none';
+        imgEl.src = item.flipped ? "地瓜田/烤焦地瓜_背面.png" : "地瓜田/烤焦地瓜.png";
+        badgeEl.innerText = "烤焦了！";
+        badgeEl.className = "oven-status-badge burnt";
+        slotEl.className = "oven-slot single-big burnt";
+        return;
+    }
+
+    if (item.progress < 25) {
+        imgEl.src = "地瓜田/生地瓜.png";
+        badgeEl.innerText = `生冷地瓜 ${item.progress}%）`;
+    } else if (item.progress < 50) {
+        imgEl.src = item.flipped ? "地瓜田/過程2背面.png" : "地瓜田/過程2.png";
+        badgeEl.innerText = `微熱上色 ${item.progress}%）`;
+    } else if (!item.flipped) {
+        imgEl.src = "地瓜田/過程3.png";
+        badgeEl.innerText = `正面半熟 50% － 點擊翻面！`;
+    } else if (item.progress < 80) {
+        imgEl.src = item.progress < 65 ? "地瓜田/過程3背面.png" : "地瓜田/過程4背面.png";
+        badgeEl.innerText = ` ${item.progress}%）`;
+    } else if (item.progress < 100) {
+        imgEl.src = "地瓜田/過程4背面.png";
+        badgeEl.innerText = `即將全熟 ${item.progress}%）`;
+    } else {
+        imgEl.src = "地瓜田/熟地瓜背面.png";
+        imgEl.style.filter = "drop-shadow(0 0 14px rgba(255, 215, 0, 0.85))";
+        badgeEl.innerText = `熟度 5/5`;
+        badgeEl.className = "oven-status-badge done";
+        slotEl.className = "oven-slot single-big done";
+    }
+}
+
+function renderSingleOvenPotato() {
+    const slots = document.getElementById('ovenSlots');
+    slots.innerHTML = '';
+
+    currentOvenItem = { progress: 0, flipped: false, status: 'baking', overheat: 0 };
+
+    const slot = document.createElement('div');
+    slot.className = 'oven-slot single-big';
+    slot.id = 'singleOvenSlot';
+    slot.innerHTML = `
+        <div style="position:absolute; top:14px; color:#ffd700; font-size:16px; font-weight:bold;"> 正在烘烤：第 ${currentOvenIndex + 1} / 3 顆地瓜</div>
+        <img src="地瓜田/生地瓜.png" class="oven-potato-img" id="singleOvenImg" alt="烤地瓜">
+        <div class="oven-status-badge" id="singleOvenBadge">熟度 1/5（生冷地瓜 0%）</div>
+    `;
+
+    slot.onclick = () => {
+        if (!currentOvenItem || currentOvenItem.status !== 'baking') return;
+        if (currentOvenItem.progress >= 50 && !currentOvenItem.flipped) {
+            currentOvenItem.flipped = true;
+            slot.classList.add('flipped');
+            updatePotatoDonenessVisual(currentOvenItem);
+        }
+    };
+
+    slots.appendChild(slot);
+    updatePotatoDonenessVisual(currentOvenItem);
+}
+
+function initStage3() {
+    clearToolCursors();
+    document.getElementById('stageTitle').innerText = "第三關：地瓜火候大師 ";
+    document.getElementById('stage1Area').style.display = 'none';
+    document.getElementById('stage2Area').style.display = 'none';
+    document.getElementById('stage3Area').style.display = 'flex';
+    document.getElementById('timerBox').style.display = 'block';
+
+    gameTimeLeft = 75;
+    gameStats.bakedPerfect = 0;
+    gameStats.damaged = 0;
+    currentOvenIndex = 0;
+    tempVal = 28; // 初始在黃色安全區
+    targetTemp = 28;
+    document.getElementById('timerText').innerText = gameTimeLeft;
+    document.getElementById('scoreText').innerText = `0 / 3`;
+
+    renderSingleOvenPotato();
+    startIrregularNeedleLoop();
+
+    clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+        gameTimeLeft--;
+        document.getElementById('timerText').innerText = gameTimeLeft;
+
+        if (currentOvenItem && currentOvenItem.status === 'baking') {
+            const zone = getTempZone(tempVal);
+            const badgeEl = document.getElementById('singleOvenBadge');
+
+            if (zone === 'red') {
+                currentOvenItem.overheat++;
+                if (badgeEl) badgeEl.innerText = ` (${currentOvenItem.overheat}/4)`;
+                if (currentOvenItem.overheat >= 4) {
+                    currentOvenItem.status = 'burnt';
+                    gameStats.damaged++;
+                    updatePotatoDonenessVisual(currentOvenItem);
+                    advanceNextOvenPotato();
+                }
+            } else if (zone === 'yellow') {
+                currentOvenItem.overheat = Math.max(0, currentOvenItem.overheat - 1);
+
+                if (!currentOvenItem.flipped && currentOvenItem.progress >= 50) {
+                    updatePotatoDonenessVisual(currentOvenItem);
+                } else {
+                    currentOvenItem.progress = Math.min(100, currentOvenItem.progress + 10);
+                    updatePotatoDonenessVisual(currentOvenItem);
+
+                    if (currentOvenItem.progress >= 100 && currentOvenItem.flipped) {
+                        currentOvenItem.status = 'done';
+                        gameStats.bakedPerfect++;
+                        document.getElementById('scoreText').innerText = `${gameStats.bakedPerfect} / 3`;
+                        updatePotatoDonenessVisual(currentOvenItem);
+                        advanceNextOvenPotato();
+                    }
                 }
             } else {
-                lives--;
-                updateHUD();
-
-                f.element.remove();
-                fruits.splice(i, 1);
-
-                if (lives <= 0) {
-                    isGameOverState = true;
-                    cancelAnimationFrame(gameInterval);
-                    clearInterval(fruitSpawner);
-                    gameOver();
-                    return;
-                }
+                currentOvenItem.overheat = Math.max(0, currentOvenItem.overheat - 1);
+                if (badgeEl) badgeEl.innerText = `（熟度 ${currentOvenItem.progress}%）`;
             }
-            continue;
         }
 
-        if (f.y > containerHeight) {
-            f.element.remove();
-            fruits.splice(i, 1);
+        if (gameTimeLeft <= 0) {
+            clearInterval(timerInterval);
+            stopNeedleLoop();
+            checkStage3Result();
         }
-    }
-
-    gameInterval = requestAnimationFrame(updateGame);
+    }, 1000);
 }
 
-function updateHUD() {
-    const scoreText = document.getElementById('scoreText');
-    if (scoreText) scoreText.innerText = `已接芒果: ${mangoCount} / ${targetMango}`;
-    
-    const heartsContainer = document.getElementById('heartsContainer');
-    if (heartsContainer) {
-        let heartsHTML = '';
-        for (let i = 0; i < lives; i++) {
-            heartsHTML += `<img src="水果關卡/生命數.png" class="heart-icon" alt="heart">`;
+function advanceNextOvenPotato() {
+    setTimeout(() => {
+        currentOvenIndex++;
+        if (currentOvenIndex < 3) {
+            renderSingleOvenPotato();
+        } else {
+            clearInterval(timerInterval);
+            stopNeedleLoop();
+            checkStage3Result();
         }
-        heartsContainer.innerHTML = heartsHTML;
-    }
+    }, 850);
+}
 
-    const collectedContainer = document.getElementById('collectedFruits');
-    if (collectedContainer) {
-        const mangoPositions = [
-            { left: 42, top: -5 },
-            { left: 2,  top: 0 },
-            { left: 82, top: 0 },
-            { left: 22, top: 8 },
-            { left: 62, top: 8 }
-        ];
+function adjustHeat(val) {
+    tempVal = Math.max(2, Math.min(98, tempVal + val));
+    targetTemp = tempVal;
+    nextChangeTime = performance.now() + 450;
+    updateNeedleDisplay();
+}
 
-        let fruitsHTML = '';
-        collectedFruitList.forEach((imgSrc, index) => {
-            const pos = mangoPositions[index] || { left: 42, top: -5 };
-            fruitsHTML += `<img src="${imgSrc}" class="mango-in-basket" style="left: ${pos.left}px; top: ${pos.top}px;" alt="collected mango">`;
+function checkStage3Result() {
+    if (gameStats.bakedPerfect >= 2) {
+        let title = gameStats.bakedPerfect === 3 ? "地瓜職人滿分評價！" : "烤地瓜高手！";
+        let text = gameStats.bakedPerfect === 3
+            ? "太厲害了！烤出了香甜金黃的極品烤地瓜！"
+            : `順利烤出 ${gameStats.bakedPerfect} 顆香噴噴的烤地瓜！老街道地美味出爐囉！`;
+
+        showModal(title, text, "品嚐烤地瓜", () => {
+            document.getElementById('minigameView').style.display = 'none';
+            document.getElementById('storyModal').classList.add('active');
+            nextDialogue();
         });
-        collectedContainer.innerHTML = fruitsHTML;
+    } else {
+        showModal("烘烤失敗", `完美烤熟的地瓜不足 2 顆（成功 ${gameStats.bakedPerfect} 顆、烤焦 ${gameStats.damaged} 顆）！小丸：「維持在黃色火候區並記得翻面，再試一次吧！」`, "重新挑戰烘烤", initStage3);
     }
 }
 
-function gameWin() {
-    window.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('keyup', handleKeyUp);
-    fruits.forEach(f => f.element.remove());
-    fruits = [];
-    document.body.classList.remove('hide-cursor');
+function showModal(title, text, btnText, action, imgSrc = "") {
+    document.getElementById('modalTitle').innerText = title;
+    document.getElementById('modalText').innerText = text;
+    document.getElementById('modalBtn').innerText = btnText;
 
-    document.getElementById('modalTitle').innerText = '採收成功！';
-    document.getElementById('modalText').innerText = '太棒了！你成功採集了 5 顆新鮮芒果，快拿去交給店長吧！';
-    document.getElementById('modalBtn').innerText = '確定';
-    pendingAction = 'winGameReturnStory';
-    document.getElementById('gameModal').classList.add('show');
-}
+    const imgWrap = document.getElementById('modalImgWrap');
+    const imgEl = document.getElementById('modalImg');
+    if (imgWrap && imgEl) {
+        if (imgSrc) {
+            imgEl.src = imgSrc;
+            imgWrap.style.display = 'flex';
+        } else {
+            imgWrap.style.display = 'none';
+            imgEl.src = "";
+        }
+    }
 
-function gameOver() {
-    window.removeEventListener('keydown', handleKeyDown);
-    window.removeEventListener('keyup', handleKeyUp);
-    fruits.forEach(f => f.element.remove());
-    fruits = [];
-    document.body.classList.remove('hide-cursor');
-
-    document.getElementById('modalTitle').innerText = '採收失敗';
-    document.getElementById('modalText').innerText = '別灰心，再試一次」';
-    document.getElementById('modalBtn').innerText = `再試一次`;
-    pendingAction = 'retryGame';
+    pendingAction = action;
     document.getElementById('gameModal').classList.add('show');
 }
 
 function closeModal() {
     document.getElementById('gameModal').classList.remove('show');
-    
-    if (pendingAction === 'startMinigameFromModal') {
-        startMinigameFromStory();
+    if (pendingAction) {
+        const action = pendingAction;
         pendingAction = null;
-    } else if (pendingAction === 'winGameReturnStory') {
-        document.getElementById('minigameView').style.display = 'none';
-        document.getElementById('storyModal').classList.add('active');
-        currentStoryStep = 7; 
-        renderStoryStep();
-        pendingAction = null;
-    } else if (pendingAction === 'retryGame') {
-        startMinigame();
-    } else if (pendingAction === 'continueStoryAfterReward') {
-        nextDialogue();
-        pendingAction = null;
+
+        if (action === 'startMinigameFromModal') {
+            if (activePhase === 1) initStage1();
+            else if (activePhase === 2) initStage2();
+            else if (activePhase === 3) initStage3();
+        } else if (typeof action === 'function') {
+            action();
+        }
     }
 }
 
-function finishRegionAndReturnMap() {
-    document.body.classList.remove('hide-cursor');
-
-    if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ type: 'STAGE_CLEARED', region: '玉井' }, '*');
-        return;
+function showRewardModal(type) {
+    if (type === 'potato') {
+        showModal(
+            "香噴噴的烤地瓜！",
+            "剛出爐的烤地瓜熱氣騰騰，外皮微微焦香，剝開後露出綿密柔軟的金黃色果肉！",
+            "品嘗",
+            () => { nextDialogue(); },
+            "地瓜田/撥開的地瓜.png"
+        );
+    } else if (type === 'ticket') {
+        showModal("獲得神秘列車車票！", "", "收下", () => {
+            nextDialogue();
+        }, "劇情/車票_新化.png");
     }
-
-    document.getElementById('minigameView').style.display = 'none';
-    resetBookPage();
-    document.getElementById('historyBookModal').classList.add('active');
 }
