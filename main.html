@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>食光軌跡 - 台南美食地圖</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body, .map-view, .stage-frame-overlay {
+            background-color: #1a1514;
+            color: #f4e8d1;
+            font-family: "Microsoft JhengHei", sans-serif;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><text y="20" font-size="20">🚂</text></svg>'), auto;
+        }
+
+        button, .reset-btn, .back-map-btn, .region-layer.active, .region-layer.unlocked {
+            cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><text y="20" font-size="20">🚂</text></svg>'), pointer !important;
+        }
+
+        .map-view {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        .base-map, .region-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .region-layer {
+            display: none;
+            pointer-events: none;
+            transition: opacity 0.3s ease, filter 0.3s ease;
+        }
+
+        .region-layer.active {
+            display: block;
+            pointer-events: auto;
+            animation: breatheGlow 1.8s infinite alternate;
+        }
+
+        .region-layer.unlocked {
+            display: block;
+            pointer-events: auto;
+            opacity: 0.95;
+            filter: drop-shadow(0 0 6px rgba(255, 224, 150, 0.45));
+        }
+
+        .region-layer.unlocked:hover {
+            filter: drop-shadow(0 0 14px rgba(255, 220, 150, 0.9)) brightness(1.12);
+        }
+
+        @keyframes breatheGlow {
+            0% { filter: drop-shadow(0 0 5px rgba(255, 220, 150, 0.6)) brightness(1); opacity: 0.75; }
+            100% { filter: drop-shadow(0 0 25px rgba(255, 230, 180, 1)) brightness(1.3); opacity: 1; }
+        }
+
+        .tip {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd700;
+            background: rgba(0, 0, 0, 0.78);
+            padding: 8px 24px;
+            border-radius: 20px;
+            border: 2px solid #e5b25d;
+            z-index: 30;
+            pointer-events: none;
+            animation: fadeInOut 1.5s infinite alternate;
+        }
+
+        @keyframes fadeInOut {
+            from { opacity: 0.75; }
+            to { opacity: 1; }
+        }
+
+        .reset-btn {
+            position: absolute;
+            top: 20px;
+            right: 24px;
+            z-index: 35;
+            background: rgba(43, 35, 33, 0.9);
+            color: #e5b25d;
+            border: 2px solid #8c5830;
+            border-radius: 16px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .reset-btn:hover {
+            background: #8c5830;
+            color: #fff;
+            border-color: #ffd700;
+        }
+
+        .stage-frame-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #1a1514;
+            z-index: 100;
+        }
+
+        .stage-frame-overlay.active {
+            display: block;
+        }
+
+        .stage-frame-overlay iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+            display: block;
+        }
+
+        .back-map-btn {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 110;
+            background: rgba(43, 35, 33, 0.92);
+            color: #ffd700;
+            border: 2px solid #e5b25d;
+            border-radius: 14px;
+            padding: 6px 14px;
+            font-size: 13px;
+            font-weight: bold;
+            transition: all 0.2s ease;
+        }
+
+        .back-map-btn:hover {
+            background: #8c5830;
+            color: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="map-view" id="mapView">
+        <div class="tip" id="mapTip">✨ 提示：點擊發光區域開始挑戰！</div>
+        <button class="reset-btn" onclick="resetProgress()">↻ 重置進度</button>
+
+        <img src="地圖/空地圖.png" alt="台南空地圖" class="base-map">
+        <img src="地圖/玉井.png" id="region-玉井" class="region-layer" alt="玉井" onclick="openRegion('玉井')">
+        <img src="地圖/新化.png" id="region-新化" class="region-layer" alt="新化" onclick="openRegion('新化')">
+        <img src="地圖/麻豆.png" id="region-麻豆" class="region-layer" alt="麻豆" onclick="openRegion('麻豆')">
+        <img src="地圖/白河.png" id="region-白河" class="region-layer" alt="白河" onclick="openRegion('白河')">
+        <img src="地圖/鹽水.png" id="region-鹽水" class="region-layer" alt="鹽水" onclick="openRegion('鹽水')">
+        <img src="地圖/佳里.png" id="region-佳里" class="region-layer" alt="佳里" onclick="openRegion('佳里')">
+        <img src="地圖/安南.png" id="region-安南" class="region-layer" alt="安南" onclick="openRegion('安南')">
+        <img src="地圖/臺南.png" id="region-臺南" class="region-layer" alt="臺南" onclick="openRegion('臺南')">
+        <img src="地圖/東南.png" id="region-東南" class="region-layer" alt="東南" onclick="openRegion('東南')">
+        <img src="地圖/歸仁.png" id="region-歸仁" class="region-layer" alt="歸仁" onclick="openRegion('歸仁')">
+        <img src="地圖/永康.png" id="region-永康" class="region-layer" alt="永康" onclick="openRegion('永康')">
+    </div>
+
+    <div class="stage-frame-overlay" id="stageOverlay">
+        <button class="back-map-btn" onclick="closeStageFrame()">← 返回地圖</button>
+        <iframe id="stageFrame" src=""></iframe>
+    </div>
+
+    <script>
+        const REGION_ORDER = ['玉井', '新化', '麻豆', '白河', '鹽水', '佳里', '安南', '臺南', '東南', '歸仁', '永康'];
+        const STAGE_URLS = {
+            '玉井': '../玉井/index.html',
+            '新化': '../新化/shanhua.html'
+        };
+
+        let clearedRegions = [];
+
+        function getCurrentTarget() {
+            return REGION_ORDER.find(r => !clearedRegions.includes(r)) || null;
+        }
+
+        function isPlayable(region) {
+            return clearedRegions.includes(region) || getCurrentTarget() === region;
+        }
+
+        function renderMap() {
+            const target = getCurrentTarget();
+            REGION_ORDER.forEach(r => {
+                const el = document.getElementById(`region-${r}`);
+                if (!el) return;
+                el.classList.remove('active', 'unlocked');
+                if (clearedRegions.includes(r)) {
+                    el.classList.add('unlocked');
+                } else if (r === target) {
+                    el.classList.add('active');
+                }
+            });
+            const tip = document.getElementById('mapTip');
+            tip.innerText = target
+                ? `✨ 提示：點擊發光的【${target}】開始挑戰！（已通關色塊可重複玩）`
+                : '🎉 所有區域皆已點亮！點擊任意色塊可重複遊玩！';
+        }
+
+        function focusStageFrame() {
+            const frame = document.getElementById('stageFrame');
+            if (frame && frame.contentWindow) {
+                frame.focus();
+                frame.contentWindow.focus();
+            }
+        }
+
+        function openRegion(region) {
+            if (!isPlayable(region)) return;
+            const url = STAGE_URLS[region];
+            if (!url) {
+                alert(`【${region}】關卡尚未製作完成，敬請期待！`);
+                return;
+            }
+            const frame = document.getElementById('stageFrame');
+            const overlay = document.getElementById('stageOverlay');
+
+            frame.onload = function() {
+                injectTrainCursorToFrame(frame);
+                focusStageFrame();
+            };
+
+            frame.src = url;
+            overlay.classList.add('active');
+            setTimeout(focusStageFrame, 100);
+        }
+
+        function injectTrainCursorToFrame(frame) {
+            try {
+                const doc = frame.contentDocument || frame.contentWindow.document;
+                if (!doc || doc.getElementById('injected-train-cursor')) return;
+                const style = doc.createElement('style');
+                style.id = 'injected-train-cursor';
+                style.textContent = `
+                    html, body, div, img, canvas, section {
+                        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><text y="20" font-size="20">🚂</text></svg>'), auto;
+                    }
+                    button, a, [onclick], .nav-btn, .action-btn, .story-choice-btn {
+                        cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"><text y="20" font-size="20">🚂</text></svg>'), pointer !important;
+                    }
+                    body.hide-cursor, body.hide-cursor * {
+                        cursor: none !important;
+                    }
+                `;
+                doc.head.appendChild(style);
+            } catch (e) {}
+        }
+
+        function closeStageFrame() {
+            const overlay = document.getElementById('stageOverlay');
+            const frame = document.getElementById('stageFrame');
+            overlay.classList.remove('active');
+            frame.src = '';
+            renderMap();
+        }
+
+        function resetProgress() {
+            if (confirm('確定要重置進度，從「玉井」重新開始嗎？')) {
+                clearedRegions = [];
+                renderMap();
+            }
+        }
+
+        window.addEventListener('message', (event) => {
+            const data = event.data;
+            if (data && data.type === 'STAGE_CLEARED' && data.region) {
+                if (!clearedRegions.includes(data.region)) {
+                    clearedRegions.push(data.region);
+                }
+                closeStageFrame();
+            }
+        });
+
+        window.addEventListener('keydown', (e) => {
+            const overlay = document.getElementById('stageOverlay');
+            if (overlay && overlay.classList.contains('active') && e.key === 'Enter') {
+                const frame = document.getElementById('stageFrame');
+                if (frame && frame.contentWindow) {
+                    focusStageFrame();
+                    try {
+                        frame.contentWindow.dispatchEvent(new KeyboardEvent('keydown', {
+                            key: 'Enter',
+                            code: 'Enter',
+                            keyCode: 13,
+                            which: 13,
+                            bubbles: true
+                        }));
+                    } catch (err) {}
+                }
+            }
+        });
+
+        renderMap();
+    </script>
+</body>
+</html>
